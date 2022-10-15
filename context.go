@@ -3,6 +3,7 @@ package sonata
 import (
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"html/template"
 	"net/http"
 )
@@ -63,4 +64,11 @@ func (c *Context) XML(status int, data any) error {
 	c.W.Header().Set("Content-Type", "application/xml; charset=utf8")
 	c.W.WriteHeader(status)
 	return xml.NewEncoder(c.W).Encode(data)
+}
+
+func (c *Context) Redirect(status int, location string) {
+	if status < http.StatusMultipleChoices || status > http.StatusPermanentRedirect && status != http.StatusCreated {
+		panic(fmt.Sprintf("Cannot redirect with status code %d", status))
+	}
+	http.Redirect(c.W, c.R, location, status)
 }
