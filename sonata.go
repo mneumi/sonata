@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"text/template"
+
+	"github.com/mneumi/sonata/render"
 )
 
 const AnyMethod = "AnyMethod"
@@ -91,11 +94,28 @@ func (rg *router) Group(name string) *routerGroup {
 
 type Engine struct {
 	router
+	funcMap    template.FuncMap
+	htmlRender render.HTMLRender
 }
 
 func New() *Engine {
 	return &Engine{
 		router: router{},
+	}
+}
+
+func (e *Engine) SetFuncMap(funcMap template.FuncMap) {
+	e.funcMap = funcMap
+}
+
+func (e *Engine) LoadTemplate(pattern string) {
+	t := template.Must(template.New("").Funcs(e.funcMap).ParseGlob(pattern))
+	e.SetHTMLTemplate(t)
+}
+
+func (e *Engine) SetHTMLTemplate(t *template.Template) {
+	e.htmlRender = render.HTMLRender{
+		Template: t,
 	}
 }
 
@@ -107,8 +127,9 @@ func (e *Engine) httpRequestHandle(w http.ResponseWriter, r *http.Request) {
 			url := "/" + group.name + name
 			if r.RequestURI == url {
 				ctx := &Context{
-					W: w,
-					R: r,
+					W:      w,
+					R:      r,
+					engine: e,
 				}
 
 				if handle, ok := handleFuncMap[AnyMethod]; ok {
