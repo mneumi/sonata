@@ -1,11 +1,10 @@
 package sonata
 
 import (
-	"encoding/json"
-	"encoding/xml"
-	"fmt"
 	"html/template"
 	"net/http"
+
+	"github.com/mneumi/sonata/render"
 )
 
 type Context struct {
@@ -15,10 +14,9 @@ type Context struct {
 }
 
 func (c *Context) HTML(status int, html string) error {
-	c.W.Header().Set("Content-Type", "text/html; charset=utf8")
-	c.W.WriteHeader(status)
-	_, err := c.W.Write([]byte(html))
-	return err
+	return c.Render(status, &render.HTML{
+		Data: html,
+	})
 }
 
 func (c *Context) HTMLTemplate(name string, data any, filenames ...string) error {
@@ -44,31 +42,43 @@ func (c *Context) HTMLTemplateGlob(name string, data any, pattern string) error 
 }
 
 func (c *Context) Template(name string, data any) error {
-	c.W.Header().Set("Content-Type", "text/html; charset=utf8")
-	err := c.engine.htmlRender.Template.ExecuteTemplate(c.W, name, data)
-	return err
+	return c.Render(http.StatusOK, &render.HTML{
+		Name:       name,
+		Data:       data,
+		IsTemplate: true,
+		Template:   c.engine.htmlRender.Template,
+	})
 }
 
 func (c *Context) JSON(status int, data any) error {
-	c.W.Header().Set("Content-Type", "application/json; charset=utf8")
-	c.W.WriteHeader(status)
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-	_, err = c.W.Write(jsonData)
-	return err
+	return c.Render(status, &render.JSON{
+		Data: data,
+	})
 }
 
 func (c *Context) XML(status int, data any) error {
-	c.W.Header().Set("Content-Type", "application/xml; charset=utf8")
-	c.W.WriteHeader(status)
-	return xml.NewEncoder(c.W).Encode(data)
+	return c.Render(status, &render.XML{
+		Data: data,
+	})
 }
 
-func (c *Context) Redirect(status int, location string) {
-	if status < http.StatusMultipleChoices || status > http.StatusPermanentRedirect && status != http.StatusCreated {
-		panic(fmt.Sprintf("Cannot redirect with status code %d", status))
-	}
-	http.Redirect(c.W, c.R, location, status)
+func (c *Context) Redirect(status int, location string) error {
+	return c.Render(status, &render.Redirect{
+		Status:   status,
+		Request:  c.R,
+		Location: location,
+	})
+}
+
+func (c *Context) String(status int, format string, values ...any) error {
+	return c.Render(status, &render.String{
+		Format: format,
+		Data:   values,
+	})
+}
+
+func (c *Context) Render(status int, r render.Render) error {
+	r.WriteContentType(c.W)
+	r.WriteHeader(status, c.W)
+	return r.Render(c.W)
 }
