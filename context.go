@@ -2,6 +2,7 @@ package sonata
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"html/template"
 	"net/http"
 )
@@ -56,4 +57,10 @@ func (c *Context) JSON(status int, data any) error {
 	}
 	_, err = c.W.Write(jsonData)
 	return err
+}
+
+func (c *Context) XML(status int, data any) error {
+	c.W.Header().Set("Content-Type", "application/xml; charset=utf8")
+	c.W.WriteHeader(status)
+	return xml.NewEncoder(c.W).Encode(data)
 }
