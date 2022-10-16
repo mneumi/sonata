@@ -3,14 +3,43 @@ package sonata
 import (
 	"html/template"
 	"net/http"
+	"net/url"
 
 	"github.com/mneumi/sonata/render"
 )
 
 type Context struct {
-	W      http.ResponseWriter
-	R      *http.Request
-	engine *Engine
+	W          http.ResponseWriter
+	R          *http.Request
+	engine     *Engine
+	queryCache url.Values
+}
+
+func (c *Context) initQueryCache() {
+	if c.R != nil {
+		c.queryCache = c.R.URL.Query()
+	} else {
+		c.queryCache = url.Values{}
+	}
+}
+
+func (c *Context) GetQuery(key string) string {
+	c.initQueryCache()
+	return c.queryCache.Get(key)
+}
+
+func (c *Context) GetQueryArray(key string) ([]string, bool) {
+	c.initQueryCache()
+	values, ok := c.queryCache[key]
+	return values, ok
+}
+
+func (c *Context) DefaultQuery(key string, defaultValue string) string {
+	value := c.GetQuery(key)
+	if value == "" {
+		return defaultValue
+	}
+	return value
 }
 
 func (c *Context) HTML(status int, html string) error {

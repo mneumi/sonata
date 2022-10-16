@@ -32,7 +32,6 @@ func (rg *routerGroup) methodHandle(ctx *Context, name string, method string, ha
 	for index := len(middlewareFuncs) - 1; index >= 0; index-- {
 		handle = middlewareFuncs[index](handle)
 	}
-
 	for index := len(rg.middlewares) - 1; index >= 0; index-- {
 		handle = rg.middlewares[index](handle)
 	}
@@ -137,7 +136,7 @@ func (e *Engine) httpRequestHandle(ctx *Context, w http.ResponseWriter, r *http.
 	for _, group := range e.routerGroups {
 		for name, handleFuncMap := range group.handleFuncMap {
 			url := "/" + group.name + name
-			if r.RequestURI == url {
+			if r.URL.Path == url {
 				if handle, ok := handleFuncMap[AnyMethod]; ok {
 					group.methodHandle(ctx, name, AnyMethod, handle)
 					return
