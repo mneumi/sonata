@@ -3,14 +3,17 @@ package sonata
 import (
 	"errors"
 	"html/template"
+	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 
 	"github.com/mneumi/sonata/render"
 )
 
-const defaultMaxMemory = 32 << 20 // 32M
+const defaultMultipartMemory = 32 << 20 // 32M
 
 type Context struct {
 	W             http.ResponseWriter
@@ -30,7 +33,7 @@ func (c *Context) initQueryCache() {
 
 func (c *Context) initPostFormCache() {
 	if c.R != nil {
-		if err := c.R.ParseMultipartForm(defaultMaxMemory); err != nil {
+		if err := c.R.ParseMultipartForm(defaultMultipartMemory); err != nil {
 			if !errors.Is(err, http.ErrNotMultipart) {
 				log.Println(err)
 			}
@@ -77,6 +80,42 @@ func (c *Context) DefaultPostForm(key string, defaultValue string) string {
 		return defaultValue
 	}
 	return value
+}
+
+func (c *Context) FormFile(name string) *multipart.FileHeader {
+	file, header, err := c.R.FormFile(name)
+	if err != nil {
+		log.Println(err)
+	}
+	defer file.Close()
+	return header
+}
+
+func (c *Context) FormFiles(name string) ([]*multipart.FileHeader, error) {
+	multipartForm, err := c.MultpartForm()
+	return multipartForm.File[name], err
+}
+
+func (c *Context) SaveUploadedFile(file *multipart.FileHeader, dst string) error {
+	src, err := file.Open()
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, src)
+	return err
+}
+
+func (c *Context) MultpartForm() (*multipart.Form, error) {
+	err := c.R.ParseMultipartForm(defaultMultipartMemory)
+	return c.R.MultipartForm, err
 }
 
 func (c *Context) HTML(status int, html string) error {
