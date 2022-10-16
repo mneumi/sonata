@@ -1,18 +1,23 @@
 package sonata
 
 import (
+	"errors"
 	"html/template"
+	"log"
 	"net/http"
 	"net/url"
 
 	"github.com/mneumi/sonata/render"
 )
 
+const defaultMaxMemory = 32 << 20 // 32M
+
 type Context struct {
-	W          http.ResponseWriter
-	R          *http.Request
-	engine     *Engine
-	queryCache url.Values
+	W             http.ResponseWriter
+	R             *http.Request
+	engine        *Engine
+	queryCache    url.Values
+	postFormCache url.Values
 }
 
 func (c *Context) initQueryCache() {
@@ -20,6 +25,19 @@ func (c *Context) initQueryCache() {
 		c.queryCache = c.R.URL.Query()
 	} else {
 		c.queryCache = url.Values{}
+	}
+}
+
+func (c *Context) initPostFormCache() {
+	if c.R != nil {
+		if err := c.R.ParseMultipartForm(defaultMaxMemory); err != nil {
+			if !errors.Is(err, http.ErrNotMultipart) {
+				log.Println(err)
+			}
+		}
+		c.postFormCache = c.R.PostForm
+	} else {
+		c.postFormCache = url.Values{}
 	}
 }
 
@@ -36,6 +54,25 @@ func (c *Context) GetQueryArray(key string) ([]string, bool) {
 
 func (c *Context) DefaultQuery(key string, defaultValue string) string {
 	value := c.GetQuery(key)
+	if value == "" {
+		return defaultValue
+	}
+	return value
+}
+
+func (c *Context) GetPostForm(key string) string {
+	c.initPostFormCache()
+	return c.postFormCache.Get(key)
+}
+
+func (c *Context) GetPostFormArray(key string) ([]string, bool) {
+	c.initPostFormCache()
+	values, ok := c.postFormCache[key]
+	return values, ok
+}
+
+func (c *Context) DefaultPostForm(key string, defaultValue string) string {
+	value := c.GetPostForm(key)
 	if value == "" {
 		return defaultValue
 	}
