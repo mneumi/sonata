@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 	"text/template"
 
 	"github.com/mneumi/sonata/render"
@@ -96,11 +97,22 @@ type Engine struct {
 	router
 	funcMap    template.FuncMap
 	htmlRender render.HTMLRender
+	pool       sync.Pool
 }
 
 func New() *Engine {
-	return &Engine{
+	e := &Engine{
 		router: router{},
+	}
+	e.pool.New = func() any {
+		return e.allocateContext()
+	}
+	return e
+}
+
+func (e *Engine) allocateContext() any {
+	return &Context{
+		engine: e,
 	}
 }
 
@@ -119,19 +131,13 @@ func (e *Engine) SetHTMLTemplate(t *template.Template) {
 	}
 }
 
-func (e *Engine) httpRequestHandle(w http.ResponseWriter, r *http.Request) {
+func (e *Engine) httpRequestHandle(ctx *Context, w http.ResponseWriter, r *http.Request) {
 	method := r.Method
 
 	for _, group := range e.routerGroups {
 		for name, handleFuncMap := range group.handleFuncMap {
 			url := "/" + group.name + name
 			if r.RequestURI == url {
-				ctx := &Context{
-					W:      w,
-					R:      r,
-					engine: e,
-				}
-
 				if handle, ok := handleFuncMap[AnyMethod]; ok {
 					group.methodHandle(ctx, name, AnyMethod, handle)
 					return
@@ -155,7 +161,11 @@ func (e *Engine) httpRequestHandle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (e *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	e.httpRequestHandle(w, r)
+	ctx := e.pool.Get().(*Context)
+	ctx.W = w
+	ctx.R = r
+	e.httpRequestHandle(ctx, w, r)
+	e.pool.Put(ctx)
 }
 
 func (e *Engine) Run() {
