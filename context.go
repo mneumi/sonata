@@ -10,8 +10,8 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/mneumi/sonata/binding"
 	"github.com/mneumi/sonata/render"
-	"github.com/mneumi/sonata/render/binding"
 )
 
 const defaultMultipartMemory = 32 << 20 // 32M
