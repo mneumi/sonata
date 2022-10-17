@@ -11,16 +11,19 @@ import (
 	"os"
 
 	"github.com/mneumi/sonata/render"
+	"github.com/mneumi/sonata/render/binding"
 )
 
 const defaultMultipartMemory = 32 << 20 // 32M
 
 type Context struct {
-	W             http.ResponseWriter
-	R             *http.Request
-	engine        *Engine
-	queryCache    url.Values
-	postFormCache url.Values
+	W                     http.ResponseWriter
+	R                     *http.Request
+	engine                *Engine
+	queryCache            url.Values
+	postFormCache         url.Values
+	DisallowUnknownFields bool
+	IsValidate            bool
 }
 
 func (c *Context) initQueryCache() {
@@ -116,6 +119,29 @@ func (c *Context) SaveUploadedFile(file *multipart.FileHeader, dst string) error
 func (c *Context) MultpartForm() (*multipart.Form, error) {
 	err := c.R.ParseMultipartForm(defaultMultipartMemory)
 	return c.R.MultipartForm, err
+}
+
+func (c *Context) BindJSON(obj any) error {
+	jb := binding.JSON
+	jb.DisallowUnknownFields = true
+	jb.IsValidate = true
+	return c.MustBindWith(obj, jb)
+}
+
+func (c *Context) BindXML(obj any) error {
+	return c.MustBindWith(obj, binding.XML)
+}
+
+func (c *Context) MustBindWith(obj any, bind binding.Binding) error {
+	if err := c.ShouldBind(obj, bind); err != nil {
+		c.W.WriteHeader(http.StatusBadRequest)
+		return err
+	}
+	return nil
+}
+
+func (c *Context) ShouldBind(obj any, bind binding.Binding) error {
+	return bind.Bind(c.R, obj)
 }
 
 func (c *Context) HTML(status int, html string) error {
