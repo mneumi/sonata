@@ -24,6 +24,7 @@ type Context struct {
 	postFormCache         url.Values
 	DisallowUnknownFields bool
 	IsValidate            bool
+	StatusCode            int
 }
 
 func (c *Context) initQueryCache() {
@@ -211,5 +212,6 @@ func (c *Context) String(status int, format string, values ...any) error {
 func (c *Context) Render(status int, r render.Render) error {
 	r.WriteContentType(c.W)
 	r.WriteHeader(status, c.W)
+	c.StatusCode = status
 	return r.Render(c.W)
 }
